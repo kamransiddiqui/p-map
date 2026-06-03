@@ -1,9 +1,11 @@
+import os from 'node:os';
+import process from 'node:process';
 import test from 'ava';
 import delay from 'delay';
 import timeSpan from 'time-span';
 import randomInt from 'random-int';
 import assertInRange from './assert-in-range.js';
-import pMap, {pMapIterable, pMapSkip} from './index.js';
+import pMap, {pMapIterable, pMapSkip, pMapConcurrency} from './index.js';
 
 const sharedInput = [
 	[async () => 10, 300],
@@ -660,4 +662,20 @@ test('pMapIterable - pMapSkip', async t => {
 		pMapSkip,
 		2,
 	], async value => value)), [1, 2]);
+});
+
+test('pMapConcurrency - is a number', t => {
+	t.is(typeof pMapConcurrency, 'number');
+});
+
+test('pMapConcurrency - is at least 1', t => {
+	t.true(pMapConcurrency >= 1);
+});
+
+test('pMapConcurrency - returns 1 in CI', t => {
+	if (process.env.CI) {
+		t.is(pMapConcurrency, 1);
+	} else {
+		t.is(pMapConcurrency, os.cpus().length);
+	}
 });
