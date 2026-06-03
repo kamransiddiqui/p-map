@@ -153,3 +153,10 @@ console.log(result);
 ```
 */
 export const pMapSkip: unique symbol;
+
+/**
+A reasonable default value for the `concurrency` option.
+
+Returns `2` when running in a CI environment and `os.cpus().length` otherwise.
+*/
+export const pMapDefaultConcurrency: number;

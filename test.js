@@ -3,7 +3,7 @@ import delay from 'delay';
 import timeSpan from 'time-span';
 import randomInt from 'random-int';
 import assertInRange from './assert-in-range.js';
-import pMap, {pMapIterable, pMapSkip} from './index.js';
+import pMap, {pMapIterable, pMapSkip, pMapDefaultConcurrency} from './index.js';
 
 const sharedInput = [
 	[async () => 10, 300],
@@ -660,4 +660,11 @@ test('pMapIterable - pMapSkip', async t => {
 		pMapSkip,
 		2,
 	], async value => value)), [1, 2]);
+});
+
+test('pMapDefaultConcurrency', async t => {
+	t.true(Number.isSafeInteger(pMapDefaultConcurrency));
+	t.true(pMapDefaultConcurrency >= 1);
+
+	await t.notThrowsAsync(pMap([1, 2, 3], async value => value, {concurrency: pMapDefaultConcurrency}));
 });
