@@ -123,6 +123,20 @@ export function pMapIterable<Element, NewElement>(
 ): AsyncIterable<Exclude<NewElement, typeof pMapSkip>>;
 
 /**
+A reasonable default for the `concurrency` option.
+
+Uses `os.cpus().length` as the baseline, but limits it to `1` when running in a CI environment to avoid overloading the CI runner.
+
+@example
+```
+import pMap, {pMapConcurrency} from 'p-map';
+
+await pMap(sites, mapper, {concurrency: pMapConcurrency});
+```
+*/
+export const pMapConcurrency: number;
+
+/**
 Return this value from a `mapper` function to skip including the value in the returned array.
 
 @example
