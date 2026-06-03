@@ -285,4 +285,4 @@ export function pMapIterable(
 
 export const pMapSkip = Symbol('skip');
 
-export const pMapConcurrency = process.env.CI ? 1 : os.cpus().length;
+export const pMapConcurrency = process.env.CI ? Math.min(2, os.cpus().length) : os.cpus().length;

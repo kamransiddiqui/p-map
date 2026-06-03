@@ -157,7 +157,7 @@ export const pMapSkip: unique symbol;
 /**
 A reasonable default for the `concurrency` option.
 
-In a CI environment, the value is `1` to avoid overwhelming the CI environment. Otherwise, it defaults to the number of CPU cores.
+In a CI environment, the value is clamped to `2` to avoid overwhelming shared CI runners. Otherwise, it defaults to the number of CPU cores.
 
 @example
 ```

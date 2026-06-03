@@ -672,9 +672,9 @@ test('pMapConcurrency - is at least 1', t => {
 	t.true(pMapConcurrency >= 1);
 });
 
-test('pMapConcurrency - returns 1 in CI', t => {
+test('pMapConcurrency - clamped to 2 in CI', t => {
 	if (process.env.CI) {
-		t.is(pMapConcurrency, 1);
+		t.is(pMapConcurrency, Math.min(2, os.cpus().length));
 	} else {
 		t.is(pMapConcurrency, os.cpus().length);
 	}
