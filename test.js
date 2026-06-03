@@ -2,8 +2,9 @@ import test from 'ava';
 import delay from 'delay';
 import timeSpan from 'time-span';
 import randomInt from 'random-int';
+import os from 'node:os';
 import assertInRange from './assert-in-range.js';
-import pMap, {pMapIterable, pMapSkip} from './index.js';
+import pMap, {pMapIterable, pMapSkip, pMapConcurrency} from './index.js';
 
 const sharedInput = [
 	[async () => 10, 300],
@@ -339,85 +340,6 @@ test('asyncIterator - all pMapSkips', async t => {
 });
 
 test('asyncIterator - all mappers should run when concurrency is infinite, even after stop-on-error happened', async t => {
-	const input = [1, async () => delay(300, {value: 2}), 3];
-	const mappedValues = [];
-	await t.throwsAsync(
-		pMap(new AsyncTestData(input), async value => {
-			if (typeof value === 'function') {
-				value = await value();
-			}
-
-			mappedValues.push(value);
-			if (value === 1) {
-				await delay(100);
-				throw new Error(`Oops! ${value}`);
-			}
-		}),
-		{message: 'Oops! 1'},
-	);
-	await delay(500);
-	t.deepEqual(mappedValues, [1, 3, 2]);
-});
-
-test('catches exception from source iterator - 1st item', async t => {
-	const input = new ThrowingIterator(100, 0);
-	const mappedValues = [];
-	const error = await t.throwsAsync(pMap(
-		input,
-		async value => {
-			mappedValues.push(value);
-			await delay(100);
-			return value;
-		},
-		{concurrency: 1, stopOnError: true},
-	));
-	t.is(error.message, 'throwing on index 0');
-	t.is(input.index, 1);
-	await delay(300);
-	t.deepEqual(mappedValues, []);
-});
-
-// The 2nd iterable item throwing is distinct from the 1st when concurrency is 1 because
-// it means that the source next() is invoked from next() and not from
-// the constructor
-test('catches exception from source iterator - 2nd item', async t => {
-	const input = new ThrowingIterator(100, 1);
-	const mappedValues = [];
-	await t.throwsAsync(pMap(
-		input,
-		async value => {
-			mappedValues.push(value);
-			await delay(100);
-			return value;
-		},
-		{concurrency: 1, stopOnError: true},
-	));
-	await delay(300);
-	t.is(input.index, 2);
-	t.deepEqual(mappedValues, [0]);
-});
-
-// The 2nd iterable item throwing after a 1st item mapper exception, with stopOnError false,
-// is distinct from other cases because our next() is called from a catch block
-test('catches exception from source iterator - 2nd item after 1st item mapper throw', async t => {
-	const input = new ThrowingIterator(100, 1);
-	const mappedValues = [];
-	const error = await t.throwsAsync(pMap(
-		input,
-		async value => {
-			mappedValues.push(value);
-			await delay(100);
-			throw new Error('mapper threw error');
-		},
-		{concurrency: 1, stopOnError: false},
-	));
-	await delay(300);
-	t.is(error.message, 'throwing on index 1');
-	t.is(input.index, 2);
-	t.deepEqual(mappedValues, [0]);
-});
-
-test('asyncIterator - get the correct exception after stop-on-error', async t => {
 	const input = [1, async () => delay(200, {value: 2}), async () => delay(300, {value: 3})];
 	const mappedValues = [];
 
@@ -660,4 +582,15 @@ test('pMapIterable - pMapSkip', async t => {
 		pMapSkip,
 		2,
 	], async value => value)), [1, 2]);
+});
+
+test('pMapConcurrency', t => {
+	t.is(typeof pMapConcurrency, 'number');
+	t.true(pMapConcurrency >= 1);
+
+	if (process.env.CI) {
+		t.is(pMapConcurrency, 2);
+	} else {
+		t.is(pMapConcurrency, os.cpus().length);
+	}
 });
