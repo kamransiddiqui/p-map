@@ -1,3 +1,8 @@
+import os from 'node:os';
+import process from 'node:process';
+
+export const pMapConcurrency = process.env.CI ? 2 : Math.max(1, os.cpus().length);
+
 export default async function pMap(
 	iterable,
 	mapper,
