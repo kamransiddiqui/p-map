@@ -284,7 +284,7 @@ export async function pMapWhile(
 	fn,
 	condition,
 	{
-		concurrency = Number.POSITIVE_INFINITY,
+		concurrency = 1,
 		interval,
 		signal,
 	} = {},

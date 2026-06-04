@@ -99,7 +99,7 @@ Type: `object`
 ##### concurrency
 
 Type: `number` *(Integer)*\
-Default: `Infinity`\
+Default: `Infinity` (for `pMap` and `pMapIterable`), `1` (for `pMapWhile`)\
 Minimum: `1`
 
 Number of concurrently pending promises returned by `mapper`.

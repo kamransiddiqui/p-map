@@ -57,6 +57,15 @@ export type IterableOptions = BaseOptions & {
 
 export type WhileOptions = BaseOptions & {
 	/**
+	Number of concurrently pending promises.
+
+	Must be an integer from 1 and up or `Infinity`.
+
+	@default 1
+	*/
+	readonly concurrency?: number;
+
+	/**
 	Interval in milliseconds to wait before checking the condition again when it returns `false`. When `undefined`, the execution stops when the condition returns `false` and all pending promises have settled.
 
 	@default undefined
