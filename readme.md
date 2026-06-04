@@ -54,6 +54,30 @@ for await (const post of pMapIterable(postIds, getPostMetadata, {concurrency: 8}
 };
 ```
 
+### pMapWhile(fn, condition, options?)
+
+Repeatedly call `fn` concurrently while `condition` returns `true`.
+
+Returns a `Promise` that resolves when the condition returns `false` and all pending promises have settled (or when aborted).
+
+```js
+import {pMapWhile} from 'p-map';
+
+const items = [1, 2, 3, 4, 5];
+const results = [];
+
+const fn = async () => {
+	const item = items.shift();
+	if (await isValid(item)) {
+		results.push(item);
+	}
+};
+
+const condition = () => items.length > 0 && results.length < 3;
+
+await pMapWhile(fn, condition, {concurrency: 2, interval: 100});
+```
+
 #### input
 
 Type: `AsyncIterable<Promise<unknown> | unknown> | Iterable<Promise<unknown> | unknown>`
@@ -75,7 +99,7 @@ Type: `object`
 ##### concurrency
 
 Type: `number` *(Integer)*\
-Default: `Infinity`\
+Default: `Infinity` (for `pMap` and `pMapIterable`), `1` (for `pMapWhile`)\
 Minimum: `1`
 
 Number of concurrently pending promises returned by `mapper`.
@@ -107,7 +131,7 @@ Caveat: When `true`, any already-started async mappers will continue to run unti
 
 ##### signal
 
-**Only for `pMap`**
+**Only for `pMap` and `pMapWhile`**
 
 Type: [`AbortSignal`](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal)
 
@@ -128,6 +152,15 @@ const mapper = async value => value;
 await pMap([delay(1000), delay(1000)], mapper, {signal: abortController.signal});
 // Throws AbortError (DOMException) after 500 ms.
 ```
+
+##### interval
+
+**Only for `pMapWhile`**
+
+Type: `number` *(Integer)*\
+Default: `undefined`
+
+Interval in milliseconds to wait before checking the condition again when it returns `false`. When `undefined`, the execution stops when the condition returns `false` and all pending promises have settled.
 
 ### pMapSkip
 

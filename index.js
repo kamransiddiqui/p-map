@@ -280,4 +280,118 @@ export function pMapIterable(
 	};
 }
 
+export async function pMapWhile(
+	fn,
+	condition,
+	{
+		concurrency = 1,
+		interval,
+		signal,
+	} = {},
+) {
+	if (typeof fn !== 'function') {
+		throw new TypeError('Function is required');
+	}
+
+	if (typeof condition !== 'function') {
+		throw new TypeError('Condition function is required');
+	}
+
+	if (!((Number.isSafeInteger(concurrency) && concurrency >= 1) || concurrency === Number.POSITIVE_INFINITY)) {
+		throw new TypeError(`Expected \`concurrency\` to be an integer from 1 and up or \`Infinity\`, got \`${concurrency}\` (${typeof concurrency})`);
+	}
+
+	return new Promise((resolve_, reject_) => {
+		let isStopped = false;
+		let resolvingCount = 0;
+		let checkTimeout;
+		let isRunning = false;
+
+		const signalListener = () => {
+			reject(signal.reason);
+		};
+
+		const cleanup = () => {
+			signal?.removeEventListener('abort', signalListener);
+			clearTimeout(checkTimeout);
+		};
+
+		const resolve = () => {
+			isStopped = true;
+			resolve_();
+			cleanup();
+		};
+
+		const reject = reason => {
+			isStopped = true;
+			reject_(reason);
+			cleanup();
+		};
+
+		if (signal) {
+			if (signal.aborted) {
+				reject(signal.reason);
+				return;
+			}
+
+			signal.addEventListener('abort', signalListener, {once: true});
+		}
+
+		const trySpawn = () => {
+			if (isStopped || isRunning) {
+				return;
+			}
+
+			isRunning = true;
+			clearTimeout(checkTimeout);
+
+			(async () => {
+				try {
+					// eslint-disable-next-line no-unmodified-loop-condition, no-await-in-loop
+					while (!isStopped && resolvingCount < concurrency && await condition()) {
+						resolvingCount++;
+
+						(async () => {
+							try {
+								await fn();
+							} catch (error) {
+								if (!isStopped) {
+									reject(error);
+								}
+
+								return;
+							} finally {
+								resolvingCount--;
+							}
+
+							if (!isStopped) {
+								trySpawn();
+							}
+						})();
+					}
+				} catch (error) {
+					if (!isStopped) {
+						reject(error);
+					}
+
+					return;
+				} finally {
+					isRunning = false;
+				}
+
+				if (!isStopped && resolvingCount === 0) {
+					if (interval === undefined) {
+						resolve();
+					} else {
+						clearTimeout(checkTimeout);
+						checkTimeout = setTimeout(trySpawn, interval);
+					}
+				}
+			})();
+		};
+
+		trySpawn();
+	});
+}
+
 export const pMapSkip = Symbol('skip');

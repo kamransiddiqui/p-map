@@ -3,7 +3,7 @@ import delay from 'delay';
 import timeSpan from 'time-span';
 import randomInt from 'random-int';
 import assertInRange from './assert-in-range.js';
-import pMap, {pMapIterable, pMapSkip} from './index.js';
+import pMap, {pMapIterable, pMapSkip, pMapWhile} from './index.js';
 
 const sharedInput = [
 	[async () => 10, 300],
@@ -661,3 +661,140 @@ test('pMapIterable - pMapSkip', async t => {
 		2,
 	], async value => value)), [1, 2]);
 });
+
+//
+// pMapWhile tests
+//
+
+test('pMapWhile - basic', async t => {
+	const results = [];
+	let count = 0;
+
+	const fn = async () => {
+		await delay(50);
+		results.push(count++);
+	};
+
+	const condition = () => count < 3;
+
+	await pMapWhile(fn, condition, {concurrency: 1});
+
+	t.deepEqual(results, [0, 1, 2]);
+});
+
+test('pMapWhile - concurrency', async t => {
+	const concurrency = 3;
+	let running = 0;
+	let maxRunning = 0;
+	let count = 0;
+
+	const fn = async () => {
+		running++;
+		maxRunning = Math.max(maxRunning, running);
+		await delay(100);
+		running--;
+		count++;
+	};
+
+	const condition = () => count < 10;
+
+	await pMapWhile(fn, condition, {concurrency});
+
+	t.is(maxRunning, concurrency);
+});
+
+test('pMapWhile - fn throws', async t => {
+	let count = 0;
+
+	const fn = async () => {
+		count++;
+		if (count === 2) {
+			throw new Error('foo');
+		}
+	};
+
+	const condition = () => count < 5;
+
+	await t.throwsAsync(pMapWhile(fn, condition, {concurrency: 1}), {message: 'foo'});
+});
+
+test('pMapWhile - condition throws', async t => {
+	let count = 0;
+
+	const fn = async () => {
+		count++;
+	};
+
+	const condition = () => {
+		if (count === 2) {
+			throw new Error('bar');
+		}
+
+		return count < 5;
+	};
+
+	await t.throwsAsync(pMapWhile(fn, condition, {concurrency: 1}), {message: 'bar'});
+});
+
+test('pMapWhile - invalid fn', async t => {
+	await t.throwsAsync(pMapWhile('not a function', () => true), {instanceOf: TypeError});
+});
+
+test('pMapWhile - invalid condition', async t => {
+	await t.throwsAsync(pMapWhile(async () => {}, 'not a function'), {instanceOf: TypeError});
+});
+
+test('pMapWhile - invalid concurrency', async t => {
+	await t.throwsAsync(pMapWhile(async () => {}, () => true, {concurrency: 0}), {instanceOf: TypeError});
+});
+
+if (globalThis.AbortController !== undefined) {
+	test('pMapWhile - abort by AbortController', async t => {
+		const abortController = new AbortController();
+
+		setTimeout(() => {
+			abortController.abort();
+		}, 100);
+
+		const fn = async () => {
+			await delay(1000);
+		};
+
+		await t.throwsAsync(pMapWhile(fn, () => true, {signal: abortController.signal}), {
+			name: 'AbortError',
+		});
+	});
+
+	test('pMapWhile - persistent with interval', async t => {
+		const results = [];
+		let count = 0;
+		let paused = false;
+
+		const fn = async () => {
+			await delay(50);
+			results.push(count++);
+		};
+
+		const condition = () => {
+			if (count === 2 && !paused) {
+				paused = true;
+				setTimeout(() => {
+					paused = false;
+				}, 150);
+				return false;
+			}
+
+			return count < 4;
+		};
+
+		const abortController = new AbortController();
+
+		const task = pMapWhile(fn, condition, {concurrency: 1, interval: 50, signal: abortController.signal});
+
+		await delay(500);
+		abortController.abort();
+		await t.throwsAsync(task, {name: 'AbortError'});
+
+		t.deepEqual(results, [0, 1, 2, 3]);
+	});
+}
