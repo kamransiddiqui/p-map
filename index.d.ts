@@ -55,6 +55,20 @@ export type IterableOptions = BaseOptions & {
 	readonly backpressure?: number;
 };
 
+export type WhileOptions = BaseOptions & {
+	/**
+	Interval in milliseconds to wait before checking the condition again when it returns `false`. When `undefined`, the execution stops when the condition returns `false` and all pending promises have settled.
+
+	@default undefined
+	*/
+	readonly interval?: number;
+
+	/**
+	You can abort the promises using [`AbortController`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController).
+	*/
+	readonly signal?: AbortSignal | undefined;
+};
+
 type MaybePromise<T> = T | Promise<T>;
 
 /**
@@ -121,6 +135,38 @@ export function pMapIterable<Element, NewElement>(
 	mapper: Mapper<Element, NewElement>,
 	options?: IterableOptions
 ): AsyncIterable<Exclude<NewElement, typeof pMapSkip>>;
+
+/**
+Repeatedly call `fn` concurrently while `condition` returns `true`.
+
+@param fn - Function to call repeatedly.
+@param condition - Function that returns a boolean indicating whether to continue calling `fn`.
+@returns A `Promise` that resolves when the condition returns `false` and all pending promises have settled (or when aborted).
+
+@example
+```
+import {pMapWhile} from 'p-map';
+
+const items = [1, 2, 3, 4, 5];
+const results = [];
+
+const fn = async () => {
+	const item = items.shift();
+	if (await isValid(item)) {
+		results.push(item);
+	}
+};
+
+const condition = () => items.length > 0 && results.length < 3;
+
+await pMapWhile(fn, condition, {concurrency: 2, interval: 100});
+```
+*/
+export function pMapWhile(
+	fn: () => MaybePromise<unknown>,
+	condition: () => MaybePromise<boolean>,
+	options?: WhileOptions
+): Promise<void>;
 
 /**
 Return this value from a `mapper` function to skip including the value in the returned array.
