@@ -153,3 +153,17 @@ console.log(result);
 ```
 */
 export const pMapSkip: unique symbol;
+
+/**
+A reasonable default value for the `concurrency` option.
+
+It is `1` in CI environments to avoid overwhelming shared CI runners, and otherwise the number of CPUs.
+
+@example
+```
+import pMap, {pMapDefaultConcurrency} from 'p-map';
+
+const result = await pMap(sites, mapper, {concurrency: pMapDefaultConcurrency});
+```
+*/
+export const pMapDefaultConcurrency: number;

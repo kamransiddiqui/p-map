@@ -1,5 +1,5 @@
 import {expectType, expectAssignable} from 'tsd';
-import pMap, {pMapIterable, type Options, type Mapper, pMapSkip} from './index.js';
+import pMap, {pMapIterable, type Options, type Mapper, pMapSkip, pMapDefaultConcurrency} from './index.js';
 
 const sites = [
 	'https://sindresorhus.com',
@@ -80,3 +80,5 @@ expectType<AsyncIterable<string>>(pMapIterable(sites, asyncMapper));
 expectType<AsyncIterable<string>>(pMapIterable(sitesWithPromises, asyncMapper));
 expectType<AsyncIterable<string>>(pMapIterable(sitesAsyncIterable, asyncMapper));
 expectType<AsyncIterable<string>>(pMapIterable(sitesAsyncIterableWithPromises, asyncMapper));
+
+expectType<number>(pMapDefaultConcurrency);
