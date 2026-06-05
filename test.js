@@ -1,9 +1,11 @@
+import os from 'node:os';
+import process from 'node:process';
 import test from 'ava';
 import delay from 'delay';
 import timeSpan from 'time-span';
 import randomInt from 'random-int';
 import assertInRange from './assert-in-range.js';
-import pMap, {pMapIterable, pMapSkip} from './index.js';
+import pMap, {pMapIterable, pMapSkip, pMapConcurrency} from './index.js';
 
 const sharedInput = [
 	[async () => 10, 300],
@@ -660,4 +662,28 @@ test('pMapIterable - pMapSkip', async t => {
 		pMapSkip,
 		2,
 	], async value => value)), [1, 2]);
+});
+
+test('pMapConcurrency', t => {
+	t.is(typeof pMapConcurrency, 'number');
+	t.true(Number.isInteger(pMapConcurrency));
+	t.true(pMapConcurrency >= 1);
+
+	if (process.env.CI) {
+		t.is(pMapConcurrency, 1);
+	} else {
+		t.is(pMapConcurrency, Math.max(1, os.cpus().length));
+	}
+});
+
+test('pMapConcurrency - used with pMap', async t => {
+	const input = [1, 2, 3];
+	const result = await pMap(input, async value => value, {concurrency: pMapConcurrency});
+	t.deepEqual(result, [1, 2, 3]);
+});
+
+test('pMapConcurrency - used with pMapIterable', async t => {
+	const input = [1, 2, 3];
+	const result = await collectAsyncIterable(pMapIterable(input, async value => value, {concurrency: pMapConcurrency}));
+	t.deepEqual(result, [1, 2, 3]);
 });
