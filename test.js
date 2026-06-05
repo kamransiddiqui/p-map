@@ -1,9 +1,11 @@
+import os from 'node:os';
+import process from 'node:process';
 import test from 'ava';
 import delay from 'delay';
 import timeSpan from 'time-span';
 import randomInt from 'random-int';
 import assertInRange from './assert-in-range.js';
-import pMap, {pMapIterable, pMapSkip} from './index.js';
+import pMap, {pMapIterable, pMapSkip, pMapConcurrency} from './index.js';
 
 const sharedInput = [
 	[async () => 10, 300],
@@ -217,6 +219,18 @@ test('all mappers should run when concurrency is infinite, even after stop-on-er
 	);
 	await delay(500);
 	t.deepEqual(mappedValues, [1, 3, 2]);
+});
+
+test('pMapConcurrency', t => {
+	t.is(typeof pMapConcurrency, 'number');
+	t.true(Number.isInteger(pMapConcurrency));
+	t.true(pMapConcurrency >= 1);
+
+	if (process.env.CI) {
+		t.is(pMapConcurrency, 2);
+	} else {
+		t.is(pMapConcurrency, os.cpus().length);
+	}
 });
 
 class AsyncTestData {

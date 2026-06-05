@@ -129,6 +129,18 @@ await pMap([delay(1000), delay(1000)], mapper, {signal: abortController.signal})
 // Throws AbortError (DOMException) after 500 ms.
 ```
 
+### pMapConcurrency
+
+A recommended value for the `concurrency` option.
+
+Returns `2` when running in a CI environment, otherwise the number of CPU cores. This is a reasonable default for most use cases.
+
+```js
+import pMap, {pMapConcurrency} from 'p-map';
+
+const result = await pMap(sites, mapper, {concurrency: pMapConcurrency});
+```
+
 ### pMapSkip
 
 Return this value from a `mapper` function to skip including the value in the returned array.
