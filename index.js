@@ -1,3 +1,6 @@
+import os from 'node:os';
+import process from 'node:process';
+
 export default async function pMap(
 	iterable,
 	mapper,
@@ -281,3 +284,5 @@ export function pMapIterable(
 }
 
 export const pMapSkip = Symbol('skip');
+
+export const pMapDefaultConcurrency = process.env.CI ? 2 : (os.cpus().length || 1);

@@ -159,6 +159,18 @@ console.log(result);
 //=> ['https://sindresorhus.com/', 'https://avajs.dev/', 'https://github.com/']
 ```
 
+### pMapDefaultConcurrency
+
+A reasonable default value for the `concurrency` option.
+
+It is set to the number of CPU cores, but limited to `2` when running in a CI environment to avoid overloading the CI server.
+
+```js
+import pMap, {pMapDefaultConcurrency} from 'p-map';
+
+const result = await pMap(sites, mapper, {concurrency: pMapDefaultConcurrency});
+```
+
 ## Recipes
 
 ### Rate limiting
