@@ -1,9 +1,11 @@
+import os from 'node:os';
+import process from 'node:process';
 import test from 'ava';
 import delay from 'delay';
 import timeSpan from 'time-span';
 import randomInt from 'random-int';
 import assertInRange from './assert-in-range.js';
-import pMap, {pMapIterable, pMapSkip} from './index.js';
+import pMap, {pMapIterable, pMapSkip, pMapConcurrency} from './index.js';
 
 const sharedInput = [
 	[async () => 10, 300],
@@ -339,24 +341,22 @@ test('asyncIterator - all pMapSkips', async t => {
 });
 
 test('asyncIterator - all mappers should run when concurrency is infinite, even after stop-on-error happened', async t => {
-	const input = [1, async () => delay(300, {value: 2}), 3];
+	const input = [1, async () => delay(300, {value: 2}), async () => delay(300, {value: 3})];
 	const mappedValues = [];
-	await t.throwsAsync(
-		pMap(new AsyncTestData(input), async value => {
-			if (typeof value === 'function') {
-				value = await value();
-			}
 
-			mappedValues.push(value);
-			if (value === 1) {
-				await delay(100);
-				throw new Error(`Oops! ${value}`);
-			}
-		}),
-		{message: 'Oops! 1'},
-	);
+	const task = pMap(new AsyncTestData(input), async value => {
+		if (typeof value === 'function') {
+			value = await value();
+		}
+
+		mappedValues.push(value);
+		// Throw for each item - all should fail and we should get only the first
+		await delay(100);
+		throw new Error(`Oops! ${value}`);
+	});
 	await delay(500);
-	t.deepEqual(mappedValues, [1, 3, 2]);
+	await t.throwsAsync(task, {message: 'Oops! 1'});
+	t.deepEqual(mappedValues, [1, 2, 3]);
 });
 
 test('catches exception from source iterator - 1st item', async t => {
@@ -660,4 +660,30 @@ test('pMapIterable - pMapSkip', async t => {
 		pMapSkip,
 		2,
 	], async value => value)), [1, 2]);
+});
+
+//
+// pMapConcurrency tests
+//
+
+test('pMapConcurrency is a positive integer', t => {
+	t.is(typeof pMapConcurrency, 'number');
+	t.true(Number.isInteger(pMapConcurrency));
+	t.true(pMapConcurrency >= 1);
+});
+
+test('pMapConcurrency is 2 in CI', async t => {
+	const originalCI = process.env.CI;
+	process.env.CI = 'true';
+	const {pMapConcurrency: concurrency} = await import(`./index.js?ci-test=${Date.now()}`);
+	t.is(concurrency, 2);
+	process.env.CI = originalCI;
+});
+
+test('pMapConcurrency is based on CPU count when not in CI', async t => {
+	const originalCI = process.env.CI;
+	delete process.env.CI;
+	const {pMapConcurrency: concurrency} = await import(`./index.js?non-ci-test=${Date.now()}`);
+	t.is(concurrency, Math.min(Math.max(1, os.cpus().length), 8));
+	process.env.CI = originalCI;
 });
