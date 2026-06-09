@@ -105,6 +105,17 @@ When `false`, instead of stopping when a promise rejects, it will wait for all t
 
 Caveat: When `true`, any already-started async mappers will continue to run until they resolve or reject. In the case of infinite concurrency with sync iterables, *all* mappers are invoked on startup and will continue after the first rejection. Use the `signal` option for abort control.
 
+##### throwOnError
+
+**Only for `pMap`**
+
+Type: `boolean`\
+Default: `true`
+
+When `true`, errors will be thrown as usual.
+
+When `false`, the function will always resolve with an array of settlement objects (`{status: 'fulfilled', value}` or `{status: 'rejected', reason}`) similar to `Promise.allSettled`, regardless of whether any promises rejected.
+
 ##### signal
 
 **Only for `pMap`**

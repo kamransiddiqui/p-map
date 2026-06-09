@@ -4,6 +4,7 @@ export default async function pMap(
 	{
 		concurrency = Number.POSITIVE_INFINITY,
 		stopOnError = true,
+		throwOnError = true,
 		signal,
 	} = {},
 ) {
@@ -50,6 +51,29 @@ export default async function pMap(
 			cleanup();
 		};
 
+		const resolveSettled = () => {
+			isResolved = true;
+			cleanup();
+
+			if (skippedIndexesMap.size === 0) {
+				resolve(result);
+				return;
+			}
+
+			const pureResult = [];
+
+			// Support multiple `pMapSkip`'s.
+			for (const [index, value] of result.entries()) {
+				if (skippedIndexesMap.get(index) === pMapSkip) {
+					continue;
+				}
+
+				pureResult.push(value);
+			}
+
+			resolve(pureResult);
+		};
+
 		if (signal) {
 			if (signal.aborted) {
 				reject(signal.reason);
@@ -78,7 +102,7 @@ export default async function pMap(
 				isIterableDone = true;
 
 				if (resolvingCount === 0 && !isResolved) {
-					if (!stopOnError && errors.length > 0) {
+					if (throwOnError && !stopOnError && errors.length > 0) {
 						reject(new AggregateError(errors)); // eslint-disable-line unicorn/error-message
 						return;
 					}
@@ -125,25 +149,44 @@ export default async function pMap(
 						skippedIndexesMap.set(index, value);
 					}
 
-					result[index] = value;
+					result[index] = !throwOnError && value !== pMapSkip ? {status: 'fulfilled', value} : value;
 
 					resolvingCount--;
 					await next();
 				} catch (error) {
-					if (stopOnError) {
-						reject(error);
+					if (throwOnError) {
+						if (stopOnError) {
+							reject(error);
+						} else {
+							errors.push(error);
+							resolvingCount--;
+
+							// In that case we can't really continue regardless of `stopOnError` state
+							// since an iterable is likely to continue throwing after it throws once.
+							// If we continue calling `next()` indefinitely we will likely end up
+							// in an infinite loop of failed iteration.
+							try {
+								await next();
+							} catch (error) {
+								reject(error);
+							}
+						}
 					} else {
-						errors.push(error);
+						result[index] = {status: 'rejected', reason: error};
 						resolvingCount--;
 
-						// In that case we can't really continue regardless of `stopOnError` state
-						// since an iterable is likely to continue throwing after it throws once.
-						// If we continue calling `next()` indefinitely we will likely end up
-						// in an infinite loop of failed iteration.
-						try {
-							await next();
-						} catch (error) {
-							reject(error);
+						if (stopOnError) {
+							resolveSettled();
+						} else {
+							// In that case we can't really continue regardless of `stopOnError` state
+							// since an iterable is likely to continue throwing after it throws once.
+							// If we continue calling `next()` indefinitely we will likely end up
+							// in an infinite loop of failed iteration.
+							try {
+								await next();
+							} catch (error) {
+								reject(error);
+							}
 						}
 					}
 				}
@@ -166,7 +209,7 @@ export default async function pMap(
 					break;
 				}
 
-				if (isIterableDone || isRejected) {
+				if (isIterableDone || isRejected || isResolved) {
 					break;
 				}
 			}

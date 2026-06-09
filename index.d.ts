@@ -22,6 +22,15 @@ export type Options = BaseOptions & {
 	readonly stopOnError?: boolean;
 
 	/**
+	When `true`, errors will be thrown as usual.
+
+	When `false`, the function will always resolve with an array of settlement objects (`{status: 'fulfilled', value}` or `{status: 'rejected', reason}`) similar to `Promise.allSettled`, regardless of whether any promises rejected.
+
+	@default true
+	*/
+	readonly throwOnError?: boolean;
+
+	/**
 	You can abort the promises using [`AbortController`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController).
 
 	@example
@@ -98,8 +107,14 @@ console.log(result);
 export default function pMap<Element, NewElement>(
 	input: AsyncIterable<Element | Promise<Element>> | Iterable<Element | Promise<Element>>,
 	mapper: Mapper<Element, NewElement>,
-	options?: Options
+	options?: Omit<Options, 'throwOnError'> & {throwOnError?: true}
 ): Promise<Array<Exclude<NewElement, typeof pMapSkip>>>;
+
+export default function pMap<Element, NewElement>(
+	input: AsyncIterable<Element | Promise<Element>> | Iterable<Element | Promise<Element>>,
+	mapper: Mapper<Element, NewElement>,
+	options: Omit<Options, 'throwOnError'> & {throwOnError: false}
+): Promise<Array<{status: 'fulfilled'; value: Exclude<NewElement, typeof pMapSkip>} | {status: 'rejected'; reason: unknown}>>;
 
 /**
 @param input - Synchronous or asynchronous iterable that is iterated over concurrently, calling the `mapper` function for each element. Each iterated item is `await`'d before the `mapper` is invoked so the iterable may return a `Promise` that resolves to an item. Asynchronous iterables (different from synchronous iterables that return `Promise` that resolves to an item) can be used when the next item may not be ready without waiting for an asynchronous process to complete and/or the end of the iterable may be reached after the asynchronous process completes. For example, reading from a remote queue when the queue has reached empty, or reading lines from a stream.
