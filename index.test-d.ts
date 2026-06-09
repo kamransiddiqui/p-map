@@ -56,6 +56,7 @@ expectAssignable<Mapper<string, string | number>>(multiResultTypeMapper);
 expectAssignable<Options>({});
 expectAssignable<Options>({concurrency: 0});
 expectAssignable<Options>({stopOnError: false});
+expectAssignable<Options>({throwOnError: false});
 
 expectType<Promise<string[]>>(pMap(sites, asyncMapper));
 expectType<Promise<string[]>>(pMap(sites, asyncMapper, {concurrency: 2}));
@@ -75,6 +76,10 @@ expectType<Promise<number[]>>(pMap(numbers, (number: number) => {
 
 	return pMapSkip;
 }));
+
+expectType<Promise<Array<{status: 'fulfilled'; value: string | typeof pMapSkip} | {status: 'rejected'; reason: unknown}>>>(
+	pMap(sites, asyncMapper, {throwOnError: false}),
+);
 
 expectType<AsyncIterable<string>>(pMapIterable(sites, asyncMapper));
 expectType<AsyncIterable<string>>(pMapIterable(sitesWithPromises, asyncMapper));

@@ -4,6 +4,7 @@ export default async function pMap(
 	{
 		concurrency = Number.POSITIVE_INFINITY,
 		stopOnError = true,
+		throwOnError = true,
 		signal,
 	} = {},
 ) {
@@ -20,14 +21,17 @@ export default async function pMap(
 			throw new TypeError(`Expected \`concurrency\` to be an integer from 1 and up or \`Infinity\`, got \`${concurrency}\` (${typeof concurrency})`);
 		}
 
+		const effectiveStopOnError = throwOnError ? stopOnError : false;
 		const result = [];
 		const errors = [];
+		let errorCount = 0;
 		const skippedIndexesMap = new Map();
 		let isRejected = false;
 		let isResolved = false;
 		let isIterableDone = false;
 		let resolvingCount = 0;
 		let currentIndex = 0;
+		let itemCount = 0;
 		const iterator = iterable[Symbol.iterator] === undefined ? iterable[Symbol.asyncIterator]() : iterable[Symbol.iterator]();
 
 		const signalListener = () => {
@@ -58,6 +62,22 @@ export default async function pMap(
 			signal.addEventListener('abort', signalListener, {once: true});
 		}
 
+		const getSettledResult = () => {
+			const settledResult = [];
+
+			for (let index = 0; index < itemCount; index++) {
+				if (skippedIndexesMap.get(index) === pMapSkip) {
+					settledResult.push({status: 'fulfilled', value: pMapSkip});
+				} else if (errors[index] === undefined) {
+					settledResult.push({status: 'fulfilled', value: result[index]});
+				} else {
+					settledResult.push({status: 'rejected', reason: errors[index]});
+				}
+			}
+
+			return settledResult;
+		};
+
 		const next = async () => {
 			if (isResolved) {
 				return;
@@ -78,8 +98,13 @@ export default async function pMap(
 				isIterableDone = true;
 
 				if (resolvingCount === 0 && !isResolved) {
-					if (!stopOnError && errors.length > 0) {
-						reject(new AggregateError(errors)); // eslint-disable-line unicorn/error-message
+					if (!effectiveStopOnError && errorCount > 0 && throwOnError) {
+						reject(new AggregateError(errors.filter(error => error !== undefined))); // eslint-disable-line unicorn/error-message
+						return;
+					}
+
+					if (!throwOnError) {
+						resolve(getSettledResult());
 						return;
 					}
 
@@ -107,6 +132,7 @@ export default async function pMap(
 				return;
 			}
 
+			itemCount++;
 			resolvingCount++;
 
 			// Intentionally detached
@@ -130,10 +156,11 @@ export default async function pMap(
 					resolvingCount--;
 					await next();
 				} catch (error) {
-					if (stopOnError) {
+					if (effectiveStopOnError) {
 						reject(error);
 					} else {
-						errors.push(error);
+						errors[index] = error;
+						errorCount++;
 						resolvingCount--;
 
 						// In that case we can't really continue regardless of `stopOnError` state
