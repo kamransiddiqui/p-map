@@ -105,6 +105,19 @@ When `false`, instead of stopping when a promise rejects, it will wait for all t
 
 Caveat: When `true`, any already-started async mappers will continue to run until they resolve or reject. In the case of infinite concurrency with sync iterables, *all* mappers are invoked on startup and will continue after the first rejection. Use the `signal` option for abort control.
 
+##### throwOnError
+
+**Only for `pMap`**
+
+Type: `boolean`\
+Default: `true`
+
+When `false`, instead of rejecting with an `AggregateError` when `stopOnError` is `false`, it will resolve with an array of objects similar to [`Promise.allSettled`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled).
+
+Each object has a `status` property that is either `'fulfilled'` or `'rejected'`. If `status` is `'fulfilled'`, the object will have a `value` property with the resolved value. If `status` is `'rejected'`, the object will have a `reason` property with the rejection reason.
+
+This option is only relevant when `stopOnError` is `false`.
+
 ##### signal
 
 **Only for `pMap`**

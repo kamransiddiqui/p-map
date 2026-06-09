@@ -4,6 +4,7 @@ export default async function pMap(
 	{
 		concurrency = Number.POSITIVE_INFINITY,
 		stopOnError = true,
+		throwOnError = true,
 		signal,
 	} = {},
 ) {
@@ -21,7 +22,7 @@ export default async function pMap(
 		}
 
 		const result = [];
-		const errors = [];
+		const errors = new Map();
 		const skippedIndexesMap = new Map();
 		let isRejected = false;
 		let isResolved = false;
@@ -78,28 +79,42 @@ export default async function pMap(
 				isIterableDone = true;
 
 				if (resolvingCount === 0 && !isResolved) {
-					if (!stopOnError && errors.length > 0) {
-						reject(new AggregateError(errors)); // eslint-disable-line unicorn/error-message
+					if (!stopOnError && errors.size > 0 && throwOnError) {
+						reject(new AggregateError([...errors.values()])); // eslint-disable-line unicorn/error-message
 						return;
 					}
 
 					isResolved = true;
 
 					if (skippedIndexesMap.size === 0) {
-						resolve(result);
+						if (throwOnError) {
+							resolve(result);
+						} else {
+							resolve(result.map((value, index) => {
+								const error = errors.get(index);
+								if (error) {
+									return {status: 'rejected', reason: error};
+								}
+
+								return {status: 'fulfilled', value};
+							}));
+						}
+
 						return;
 					}
 
-					const pureResult = [];
-
-					// Support multiple `pMapSkip`'s.
-					for (const [index, value] of result.entries()) {
+					const pureResult = result.flatMap((value, index) => {
 						if (skippedIndexesMap.get(index) === pMapSkip) {
-							continue;
+							return [];
 						}
 
-						pureResult.push(value);
-					}
+						if (throwOnError) {
+							return [value];
+						}
+
+						const error = errors.get(index);
+						return [error ? {status: 'rejected', reason: error} : {status: 'fulfilled', value}];
+					});
 
 					resolve(pureResult);
 				}
@@ -133,7 +148,8 @@ export default async function pMap(
 					if (stopOnError) {
 						reject(error);
 					} else {
-						errors.push(error);
+						errors.set(index, error);
+						result[index] = undefined;
 						resolvingCount--;
 
 						// In that case we can't really continue regardless of `stopOnError` state
