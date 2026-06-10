@@ -9,7 +9,7 @@ export default async function pMap(
 ) {
 	// Capture the call-site stack so we can preserve async stack traces
 	// through the Promise constructor and detached async IIFEs.
-	const error = new Error('pMap');
+	const hostError = new Error('p-map');
 
 	return new Promise((resolve_, reject_) => {
 		if (iterable[Symbol.iterator] === undefined && iterable[Symbol.asyncIterator] === undefined) {
@@ -52,8 +52,8 @@ export default async function pMap(
 				return;
 			}
 
-			if (reason instanceof Error && reason.stack && error.stack) {
-				const stackLines = error.stack.split('\n');
+			if (reason instanceof Error && reason.stack && hostError.stack) {
+				const stackLines = hostError.stack.split('\n');
 				const callerStack = stackLines.slice(2).join('\n');
 
 				if (callerStack && !reason.stack.includes(callerStack)) {

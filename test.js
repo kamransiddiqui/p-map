@@ -172,6 +172,17 @@ test('aggregate errors when stopOnError is false', async t => {
 	await t.throwsAsync(pMap(errorInput2, mapper, {concurrency: 1, stopOnError: false}), {instanceOf: AggregateError, message: ''});
 });
 
+test('preserves async stack trace', async t => {
+	async function runPMap() {
+		await pMap([1], async () => {
+			throw new Error('foo');
+		});
+	}
+
+	const error = await t.throwsAsync(runPMap());
+	t.true(error.stack.includes('runPMap'));
+});
+
 test('pMapSkip', async t => {
 	t.deepEqual(await pMap([
 		1,
