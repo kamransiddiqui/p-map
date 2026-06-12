@@ -4,6 +4,7 @@ export default async function pMap(
 	{
 		concurrency = Number.POSITIVE_INFINITY,
 		stopOnError = true,
+		throwOnError = true,
 		signal,
 	} = {},
 ) {
@@ -22,6 +23,7 @@ export default async function pMap(
 
 		const result = [];
 		const errors = [];
+		const settledResults = [];
 		const skippedIndexesMap = new Map();
 		let isRejected = false;
 		let isResolved = false;
@@ -78,7 +80,7 @@ export default async function pMap(
 				isIterableDone = true;
 
 				if (resolvingCount === 0 && !isResolved) {
-					if (!stopOnError && errors.length > 0) {
+					if (!stopOnError && errors.length > 0 && throwOnError) {
 						reject(new AggregateError(errors)); // eslint-disable-line unicorn/error-message
 						return;
 					}
@@ -86,11 +88,17 @@ export default async function pMap(
 					isResolved = true;
 
 					if (skippedIndexesMap.size === 0) {
+						if (!throwOnError) {
+							resolve(settledResults);
+							return;
+						}
+
 						resolve(result);
 						return;
 					}
 
 					const pureResult = [];
+					const pureSettledResults = [];
 
 					// Support multiple `pMapSkip`'s.
 					for (const [index, value] of result.entries()) {
@@ -99,9 +107,13 @@ export default async function pMap(
 						}
 
 						pureResult.push(value);
+
+						if (!throwOnError) {
+							pureSettledResults.push(settledResults[index]);
+						}
 					}
 
-					resolve(pureResult);
+					resolve(throwOnError ? pureResult : pureSettledResults);
 				}
 
 				return;
@@ -127,9 +139,17 @@ export default async function pMap(
 
 					result[index] = value;
 
+					if (!throwOnError && value !== pMapSkip) {
+						settledResults[index] = {status: 'fulfilled', value};
+					}
+
 					resolvingCount--;
 					await next();
 				} catch (error) {
+					if (!throwOnError) {
+						settledResults[index] = {status: 'rejected', reason: error};
+					}
+
 					if (stopOnError) {
 						reject(error);
 					} else {
