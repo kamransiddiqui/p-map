@@ -22,6 +22,17 @@ export type Options = BaseOptions & {
 	readonly stopOnError?: boolean;
 
 	/**
+	When `true`, if any of the promises reject, the error will be thrown.
+
+	When `false`, instead of throwing when a promise rejects, it will return an array of objects with the status and value/reason of each promise, similar to [`Promise.allSettled`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/allSettled).
+
+	This option is only relevant when `stopOnError` is `false`.
+
+	@default true
+	*/
+	readonly throwOnError?: boolean;
+
+	/**
 	You can abort the promises using [`AbortController`](https://developer.mozilla.org/en-US/docs/Web/API/AbortController).
 
 	@example
@@ -81,7 +92,7 @@ import got from 'got';
 const sites = [
 	getWebsiteFromUsername('sindresorhus'), //=> Promise
 	'https://avajs.dev',
-	'https://github.com'
+	'https://github'
 ];
 
 const mapper = async site => {
@@ -98,8 +109,20 @@ console.log(result);
 export default function pMap<Element, NewElement>(
 	input: AsyncIterable<Element | Promise<Element>> | Iterable<Element | Promise<Element>>,
 	mapper: Mapper<Element, NewElement>,
-	options?: Options
+	options?: Options & {throwOnError?: true}
 ): Promise<Array<Exclude<NewElement, typeof pMapSkip>>>;
+
+export default function pMap<Element, NewElement>(
+	input: AsyncIterable<Element | Promise<Element>> | Iterable<Element | Promise<Element>>,
+	mapper: Mapper<Element, NewElement>,
+	options: Options & {throwOnError: false}
+): Promise<Array<{status: 'fulfilled'; value: Exclude<NewElement, typeof pMapSkip>} | {status: 'rejected'; reason: unknown}>>;
+
+export default function pMap<Element, NewElement>(
+	input: AsyncIterable<Element | Promise<Element>> | Iterable<Element | Promise<Element>>,
+	mapper: Mapper<Element, NewElement>,
+	options?: Options
+): Promise<Array<Exclude<NewElement, typeof pMapSkip>>> | Promise<Array<{status: 'fulfilled'; value: Exclude<NewElement, typeof pMapSkip>} | {status: 'rejected'; reason: unknown}>>;
 
 /**
 @param input - Synchronous or asynchronous iterable that is iterated over concurrently, calling the `mapper` function for each element. Each iterated item is `await`'d before the `mapper` is invoked so the iterable may return a `Promise` that resolves to an item. Asynchronous iterables (different from synchronous iterables that return `Promise` that resolves to an item) can be used when the next item may not be ready without waiting for an asynchronous process to complete and/or the end of the iterable may be reached after the asynchronous process completes. For example, reading from a remote queue when the queue has reached empty, or reading lines from a stream.
@@ -134,7 +157,7 @@ const sites = [
 	getWebsiteFromUsername('sindresorhus'), //=> Promise
 	'https://avajs.dev',
 	'https://example.invalid',
-	'https://github.com'
+	'https://github'
 ];
 
 const mapper = async site => {
