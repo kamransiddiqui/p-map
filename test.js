@@ -172,6 +172,53 @@ test('aggregate errors when stopOnError is false', async t => {
 	await t.throwsAsync(pMap(errorInput2, mapper, {concurrency: 1, stopOnError: false}), {instanceOf: AggregateError, message: ''});
 });
 
+test('returns settled results when throwOnError is false and stopOnError is false', async t => {
+	const result = await pMap(errorInput1, mapper, {concurrency: 1, stopOnError: false, throwOnError: false});
+	t.is(result.length, 4);
+	t.deepEqual(result[0], {status: 'fulfilled', value: 20});
+	t.deepEqual(result[1], {status: 'fulfilled', value: 30});
+	t.is(result[2].status, 'rejected');
+	t.is(result[2].reason.message, 'foo');
+	t.is(result[3].status, 'rejected');
+	t.is(result[3].reason.message, 'bar');
+});
+
+test('returns all fulfilled when throwOnError is false and no errors', async t => {
+	const result = await pMap(sharedInput, mapper, {concurrency: 1, stopOnError: false, throwOnError: false});
+	t.is(result.length, 3);
+	t.deepEqual(result, [
+		{status: 'fulfilled', value: 10},
+		{status: 'fulfilled', value: 20},
+		{status: 'fulfilled', value: 30},
+	]);
+});
+
+test('throwOnError: false with pMapSkip', async t => {
+	const result = await pMap([
+		1,
+		pMapSkip,
+		async () => {
+			throw new Error('skip-error');
+		},
+		2,
+	], async value => {
+		if (typeof value === 'function') {
+			return value();
+		}
+
+		return value;
+	}, {stopOnError: false, throwOnError: false});
+	t.is(result.length, 3);
+	t.deepEqual(result[0], {status: 'fulfilled', value: 1});
+	t.is(result[1].status, 'rejected');
+	t.is(result[1].reason.message, 'skip-error');
+	t.deepEqual(result[2], {status: 'fulfilled', value: 2});
+});
+
+test('throwOnError: true (default) still throws AggregateError', async t => {
+	await t.throwsAsync(pMap(errorInput1, mapper, {concurrency: 1, stopOnError: false, throwOnError: true}), {instanceOf: AggregateError, message: ''});
+});
+
 test('pMapSkip', async t => {
 	t.deepEqual(await pMap([
 		1,
@@ -306,6 +353,39 @@ test('asyncIterator - aggregate errors when stopOnError is false', async t => {
 	await t.notThrowsAsync(pMap(new AsyncTestData(sharedInput), mapper, {concurrency: 1, stopOnError: false}));
 	await t.throwsAsync(pMap(new AsyncTestData(errorInput1), mapper, {concurrency: 1, stopOnError: false}), {instanceOf: AggregateError, message: ''});
 	await t.throwsAsync(pMap(new AsyncTestData(errorInput2), mapper, {concurrency: 1, stopOnError: false}), {instanceOf: AggregateError, message: ''});
+});
+
+test('asyncIterator - returns settled results when throwOnError is false and stopOnError is false', async t => {
+	const result = await pMap(new AsyncTestData(errorInput1), mapper, {concurrency: 1, stopOnError: false, throwOnError: false});
+	t.is(result.length, 4);
+	t.deepEqual(result[0], {status: 'fulfilled', value: 20});
+	t.deepEqual(result[1], {status: 'fulfilled', value: 30});
+	t.is(result[2].status, 'rejected');
+	t.is(result[2].reason.message, 'foo');
+	t.is(result[3].status, 'rejected');
+	t.is(result[3].reason.message, 'bar');
+});
+
+test('asyncIterator - throwOnError: false with pMapSkip', async t => {
+	const result = await pMap(new AsyncTestData([
+		1,
+		pMapSkip,
+		async () => {
+			throw new Error('skip-error');
+		},
+		2,
+	]), async value => {
+		if (typeof value === 'function') {
+			return value();
+		}
+
+		return value;
+	}, {stopOnError: false, throwOnError: false});
+	t.is(result.length, 3);
+	t.deepEqual(result[0], {status: 'fulfilled', value: 1});
+	t.is(result[1].status, 'rejected');
+	t.is(result[1].reason.message, 'skip-error');
+	t.deepEqual(result[2], {status: 'fulfilled', value: 2});
 });
 
 test('asyncIterator - pMapSkip', async t => {
