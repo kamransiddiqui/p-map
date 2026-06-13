@@ -20,6 +20,10 @@ export default async function pMap(
 			throw new TypeError(`Expected \`concurrency\` to be an integer from 1 and up or \`Infinity\`, got \`${concurrency}\` (${typeof concurrency})`);
 		}
 
+		if (signal !== undefined && !(signal instanceof AbortSignal)) {
+			throw new TypeError('Expected `signal` to be an `AbortSignal`');
+		}
+
 		const result = [];
 		const errors = [];
 		const skippedIndexesMap = new Map();
