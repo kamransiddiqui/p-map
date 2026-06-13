@@ -484,6 +484,10 @@ test('invalid mapper', async t => {
 	await t.throwsAsync(pMap([], 'invalid mapper', {concurrency: 2}), {instanceOf: TypeError});
 });
 
+test('invalid signal', async t => {
+	await t.throwsAsync(pMap([], () => {}, {signal: {}}), {instanceOf: TypeError});
+});
+
 if (globalThis.AbortController !== undefined) {
 	test('abort by AbortController', async t => {
 		const abortController = new AbortController();
